@@ -2,12 +2,13 @@ package api
 
 import (
 	"github.com/Seaman-hub/numberserver/api/ns"
-	log "github.com/sirupsen/logrus"
+	"github.com/Seaman-hub/numberserver/internal/pools"
+	"github.com/Seaman-hub/numberserver/internal/storage"
 	"golang.org/x/net/context"
 )
 
 var (
-	numberPool *IDPool
+	numberPool *pools.IDPool
 )
 
 // NumberServerAPI defines the number-server API.
@@ -15,28 +16,27 @@ type NumberServerAPI struct {
 }
 
 // NewNumberServerAPI returns a new NumberServerAPI.
-func NewNumberServerAPI(initValue uint) *NumberServerAPI {
-	numberPool = NewIDPool(initValue)
-	numberPool.Fillhole()
+func NewNumberServerAPI(cli *storage.Etcd, prefix, dataprefix string, initValue int) *NumberServerAPI {
+	numberPool = pools.NewIDPool(
+		initValue,
+		pools.NewLockEtcd(cli.Client, prefix, pools.NewStdLogger()),
+		pools.NewIDPoolEtcd(cli.Client, dataprefix),
+		pools.NewStdLogger(),
+	)
+	numberPool.Init(context.Background())
 	return &NumberServerAPI{}
 }
 
 // GetSequenceNum returns a sequence number.
 func (n *NumberServerAPI) GetSequenceNum(ctx context.Context, req *ns.GetSequenceNumRequest) (*ns.GetSequenceNumResponse, error) {
-	mid := (uint32)(numberPool.Acquire())
-	log.WithFields(log.Fields{
-		"mid": mid,
-	}).Info("allocted")
+	mid, _ := numberPool.Acquire(ctx)
 	return &ns.GetSequenceNumResponse{
-		Number: mid,
+		Number: uint32(mid),
 	}, nil
 }
 
 // PutSequenceNum puts a sequence number back to pool.
 func (n *NumberServerAPI) PutSequenceNum(ctx context.Context, req *ns.PutSequenceNumRequest) (*ns.PutSequenceNumResponse, error) {
-	numberPool.Release((uint)(req.Number))
-	log.WithFields(log.Fields{
-		"number": req.Number,
-	}).Info("released")
+	numberPool.Release(ctx, int(req.Number))
 	return &ns.PutSequenceNumResponse{}, nil
 }

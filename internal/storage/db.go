@@ -16,7 +16,7 @@ const (
 )
 
 type Etcd struct {
-	client  *clientv3.Client
+	Client  *clientv3.Client
 	kv      clientv3.KV
 	lease   clientv3.Lease
 	watcher clientv3.Watcher
@@ -71,7 +71,7 @@ func OpenDatabase(c *cli.Context) (*Etcd, error) {
 	watcher := clientv3.NewWatcher(cli)
 
 	return &Etcd{
-		client:  cli,
+		Client:  cli,
 		kv:      kv,
 		lease:   lease,
 		watcher: watcher,
@@ -80,5 +80,5 @@ func OpenDatabase(c *cli.Context) (*Etcd, error) {
 
 // CloseDatabase close the database
 func CloseDatabase(db *Etcd) {
-	db.client.Close()
+	db.Client.Close()
 }

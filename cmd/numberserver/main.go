@@ -3,14 +3,19 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
+	mvccpb "go.etcd.io/etcd/api/v3/mvccpb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/grpclog"
 
@@ -25,11 +30,12 @@ func init() {
 }
 
 var version string // set by the compiler
+var nsapi *api.NumberServerAPI
 
 func run(c *cli.Context) error {
 	tasks := []func(*cli.Context) error{
 		printStartMessage,
-		// setEtcdConnection,
+		setEtcdConnection,
 		startAPIServer,
 	}
 
@@ -57,10 +63,15 @@ func run(c *cli.Context) error {
 }
 
 func printStartMessage(c *cli.Context) error {
+	array_or_slice := []int{1, 2, 3}
+	v := strings.Replace(strings.Trim(fmt.Sprint(array_or_slice), "[]"), " ", ",", -1)
 	log.WithFields(log.Fields{
-		"version": version,
-		"docs":    "not implemented",
+		"version":     version,
+		"docs":        "not implemented",
+		"array":       v,
+		"array_slice": array_or_slice,
 	}).Info("starting Number Server")
+
 	return nil
 }
 
@@ -81,15 +92,42 @@ func startAPIServer(c *cli.Context) error {
 
 	var opts []grpc.ServerOption
 	gs := grpc.NewServer(opts...)
-	nsAPI := api.NewNumberServerAPI(uint(c.Int("id-initial")))
-	ns.RegisterNumberServerServer(gs, nsAPI)
+	nsapi = api.NewNumberServerAPI(common.DB, "/idpool_lock/simple/", "/idpool/simple/", c.Int("id-initial"))
+	ns.RegisterNumberServerServer(gs, nsapi)
 
 	ln, err := net.Listen("tcp", c.String("bind"))
 	if err != nil {
 		return errors.Wrap(err, "start api listener error")
 	}
+
 	go gs.Serve(ln)
+	go Watch()
+
 	return nil
+}
+func Watch() {
+	log.Info("watching etcd connection")
+	wc := storage.WatchWithPrefix(common.DB, "/nat/meters/")
+	go func() {
+		for watchResp := range *wc {
+			// go func(resp clientv3.WatchResponse) {
+			for _, e := range watchResp.Events {
+				switch e.Type {
+				// case mvccpb.PUT:
+
+				case mvccpb.DELETE:
+					id := string(e.PrevKv.Key)[12:]
+					var req ns.PutSequenceNumRequest
+					num, _ := strconv.Atoi(id)
+					req.Number = uint32(num)
+					log.Info("delete watched")
+					nsapi.PutSequenceNum(context.Background(), &req)
+
+				}
+			}
+			// }(watchResp)
+		}
+	}()
 }
 
 func main() {
