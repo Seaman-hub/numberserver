@@ -21,7 +21,6 @@ func NewNumberServerAPI(cli *storage.Etcd, prefix, dataprefix string, initValue 
 		initValue,
 		pools.NewLockEtcd(cli.Client, prefix, pools.NewStdLogger()),
 		pools.NewIDPoolEtcd(cli.Client, dataprefix),
-		pools.NewStdLogger(),
 	)
 	numberPool.Init(context.Background())
 	return &NumberServerAPI{}

@@ -4,12 +4,10 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"os"
 	"os/signal"
 	"strconv"
-	"strings"
 	"syscall"
 
 	"github.com/pkg/errors"
@@ -63,13 +61,9 @@ func run(c *cli.Context) error {
 }
 
 func printStartMessage(c *cli.Context) error {
-	array_or_slice := []int{1, 2, 3}
-	v := strings.Replace(strings.Trim(fmt.Sprint(array_or_slice), "[]"), " ", ",", -1)
 	log.WithFields(log.Fields{
-		"version":     version,
-		"docs":        "not implemented",
-		"array":       v,
-		"array_slice": array_or_slice,
+		"version": version,
+		"docs":    "not implemented",
 	}).Info("starting Number Server")
 
 	return nil

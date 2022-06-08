@@ -2,6 +2,8 @@ package pools
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/pkg/errors"
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -35,12 +37,16 @@ func NewLockEtcd(cli *clientv3.Client, prefix string, logger Logger) *LockEtcd {
 // Lock creates a new session-based lock in etcd and locks it.
 func (l *LockEtcd) Lock(ctx context.Context) error {
 	var err error
+	fmt.Println("NewSession ", time.Now().UnixNano()/int64(time.Millisecond))
 	l.session, err = concurrency.NewSession(l.cli, concurrency.WithTTL(1))
 	if err != nil {
 		return errors.Wrap(err, "failed to create an etcd session")
 	}
 	l.mu = concurrency.NewMutex(l.session, l.prefix)
-	return errors.Wrap(l.mu.Lock(ctx), "failed to lock a mutex in etcd")
+	fmt.Println("NewMutex ", time.Now().UnixNano()/int64(time.Millisecond))
+	err = l.mu.Lock(ctx)
+	fmt.Println("mu.Lock ", time.Now().UnixNano()/int64(time.Millisecond))
+	return errors.Wrap(err, "failed to lock a mutex in etcd")
 }
 
 // Unlock unlocks the previously locked lock.
